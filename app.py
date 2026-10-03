@@ -35,6 +35,9 @@ h1,h2,h3 { font-family: 'Manrope', sans-serif; letter-spacing: -.035em; }
 .task-desc { color:#263851; font-weight:600; margin:8px 0 12px; line-height:1.4; }
 .task-status { color:#60738e; font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; }
 .task-card.urgent .task-status { color:#c64040; }
+[data-testid="stMetric"] { background:white; border:1px solid #e4eaf1; border-radius:12px; padding:10px 14px; }
+[data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * { color:#5b6b82 !important; }
+[data-testid="stMetricValue"], [data-testid="stMetricValue"] * { color:#17253b !important; }
 .section-card { background:white; padding:20px 22px; border-radius:16px; border:1px solid #e4eaf1; }
 .hero { flex-wrap:wrap; gap:.6rem; }
 .task-track { flex-wrap:wrap; }
@@ -90,7 +93,44 @@ if st.session_state.orchestrator is not None:
 main_col, side_col = st.columns([2.2, 1], gap="large")
 
 with side_col:
-    st.markdown("<div style='padding:4px 0 8px'><div style='font-size:1.4rem;font-weight:800;font-family:Manrope'>✦ Muse Assistant</div></div>", unsafe_allow_html=True)
+    st.markdown("<div style='padding:4px 0 8px'><div style='font-size:1.4rem;font-weight:800;font-family:Manrope'>✦ LPL Assistant</div></div>", unsafe_allow_html=True)
+    with st.container(height=220, border=True):
+        if not st.session_state.messages:
+            st.caption("No messages yet. Ask LPL Assistant below.")
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+    if st.session_state.pending_proposal:
+        proposal = st.session_state.pending_proposal
+        with st.expander("⚠️ Pending Advisor Review", expanded=True):
+            st.markdown(f"**Proposed action:** {proposal.get('action', 'Review action')}  \n{proposal.get('details', '')}")
+            st.caption(f"Drafted {proposal.get('timestamp', '')} · No external action has been taken.")
+            approve, reject = st.columns(2)
+            if approve.button("Approve & Log", type="primary", use_container_width=True, key="approve_proposal"):
+                st.session_state.audit_log.append({**proposal, "decision": "approved", "reviewed_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()})
+                st.session_state.pending_proposal = None
+                st.toast("Action approved and recorded in the local audit log.", icon="✅")
+                st.rerun()
+            if reject.button("Reject", use_container_width=True, key="reject_proposal"):
+                st.session_state.audit_log.append({**proposal, "decision": "rejected", "reviewed_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()})
+                st.session_state.pending_proposal = None
+                st.info("Proposal rejected and recorded.")
+                st.rerun()
+    prompt = st.chat_input("Ask LPL Assistant…")
+    if prompt:
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        if st.session_state.orchestrator is None:
+            response_text = f"Bedrock client setup failed: {st.session_state.orchestrator_error}. Check your AWS configuration and restart the app."
+        else:
+            selected = st.session_state.get("selected_client", CLIENTS[0]["id"])
+            current_client = next(client for client in CLIENTS if client["id"] == selected)
+            response_text = st.session_state.orchestrator.route_query(prompt, current_client, CLIENTS)
+        if response_text.startswith("BRIEFLY_PROPOSAL:"):
+            payload = json.loads(response_text.removeprefix("BRIEFLY_PROPOSAL:"))
+            st.session_state.pending_proposal = payload["proposal"]
+            response_text = payload.get("summary") or "A proposed action is ready for your review."
+        st.session_state.messages.append({"role": "assistant", "content": response_text})
+        st.rerun()
     with st.expander("⚙️ AWS & Bedrock settings", expanded=False):
         orchestrator = st.session_state.orchestrator
         if orchestrator is None:
@@ -120,43 +160,6 @@ with side_col:
             )
             st.caption("Guardrail: " + ("active" if orchestrator.guardrail_config else "not configured"))
             st.caption("Knowledge Base: " + ("connected" if orchestrator.knowledge_base_id else "not configured"))
-    with st.container(height=220, border=True):
-        if not st.session_state.messages:
-            st.caption("No messages yet. Ask Briefly below.")
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-    if st.session_state.pending_proposal:
-        proposal = st.session_state.pending_proposal
-        with st.expander("⚠️ Pending Advisor Review", expanded=True):
-            st.markdown(f"**Proposed action:** {proposal.get('action', 'Review action')}  \n{proposal.get('details', '')}")
-            st.caption(f"Drafted {proposal.get('timestamp', '')} · No external action has been taken.")
-            approve, reject = st.columns(2)
-            if approve.button("Approve & Log", type="primary", use_container_width=True, key="approve_proposal"):
-                st.session_state.audit_log.append({**proposal, "decision": "approved", "reviewed_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()})
-                st.session_state.pending_proposal = None
-                st.toast("Action approved and recorded in the local audit log.", icon="✅")
-                st.rerun()
-            if reject.button("Reject", use_container_width=True, key="reject_proposal"):
-                st.session_state.audit_log.append({**proposal, "decision": "rejected", "reviewed_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()})
-                st.session_state.pending_proposal = None
-                st.info("Proposal rejected and recorded.")
-                st.rerun()
-    prompt = st.chat_input("Ask Briefly…")
-    if prompt:
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        if st.session_state.orchestrator is None:
-            response_text = f"Bedrock client setup failed: {st.session_state.orchestrator_error}. Check your AWS configuration and restart the app."
-        else:
-            selected = st.session_state.get("selected_client", CLIENTS[0]["id"])
-            current_client = next(client for client in CLIENTS if client["id"] == selected)
-            response_text = st.session_state.orchestrator.route_query(prompt, current_client, CLIENTS)
-        if response_text.startswith("BRIEFLY_PROPOSAL:"):
-            payload = json.loads(response_text.removeprefix("BRIEFLY_PROPOSAL:"))
-            st.session_state.pending_proposal = payload["proposal"]
-            response_text = payload.get("summary") or "A proposed action is ready for your review."
-        st.session_state.messages.append({"role": "assistant", "content": response_text})
-        st.rerun()
 
 with main_col:
     st.markdown("<div class='hero'><div><div class='eyebrow'>Advisor workspace · Meeting preparation</div><h1>Good morning, Advisor</h1></div><div class='tag'>● &nbsp; Demo environment · Synthetic data</div></div>", unsafe_allow_html=True)
@@ -171,6 +174,51 @@ with main_col:
     c2.metric("Risk profile", client["risk_profile"])
     c3.metric("Age", str(client["age"]))
     c4.metric("Open tasks", str(len(client["pending_tasks"])), delta=f"{sum(t['status'] == 'urgent' for t in client['pending_tasks'])} urgent", delta_color="inverse")
+
+    st.markdown("<div class='eyebrow' style='margin:14px 0 4px'>Agentic operations</div>", unsafe_allow_html=True)
+    act1, act2, _act_gap = st.columns([1, 1, 2])
+    run_queue = act1.button("✦ Priority queue", key="generate_workday_brief", use_container_width=True)
+    run_brief = act2.button("✦ Meeting brief", type="primary", key="generate_meeting_brief", use_container_width=True)
+    if run_queue:
+        if st.session_state.orchestrator is None:
+            st.session_state.workday_brief = f"Bedrock client setup failed: {st.session_state.orchestrator_error}"
+        else:
+            with st.spinner("Reviewing urgent and upcoming work across the book…"):
+                st.session_state.workday_brief = st.session_state.orchestrator.route_query(
+                    "Prepare today's advisor operations brief across the entire client book. Use query_book_metrics to retrieve both urgent_tasks and pending_tasks. Prioritize urgent items and tasks due soon, group by client and date, and list suggested preparation steps. Do not make investment recommendations and do not claim any task or external action was completed.",
+                    client,
+                    CLIENTS,
+                )
+    if run_brief:
+        if st.session_state.orchestrator is None:
+            st.session_state.meeting_brief = f"Bedrock client setup failed: {st.session_state.orchestrator_error}"
+        else:
+            with st.spinner("Preparing a concise brief with Bedrock…"):
+                st.session_state.meeting_brief = st.session_state.orchestrator.route_query(
+                    "Prepare a concise pre-meeting brief with: client context, discussion agenda based on existing notes and pending tasks, questions to confirm with the client, and items that require advisor judgment. Clearly identify that the supplied portfolio estimate is illustrative. Do not make investment recommendations or imply that any action has been taken.",
+                    client,
+                    CLIENTS,
+                )
+    if st.session_state.workday_brief:
+        with st.expander("Today's priority queue", expanded=True):
+            st.markdown(st.session_state.workday_brief)
+            st.download_button(
+                "Download today's queue",
+                data=st.session_state.workday_brief,
+                file_name="briefly-daily-priority-queue.txt",
+                mime="text/plain",
+                key="download_workday_brief",
+            )
+    if st.session_state.meeting_brief:
+        with st.expander("Advisor-ready meeting brief", expanded=True):
+            st.markdown(st.session_state.meeting_brief)
+            st.download_button(
+                "Download brief",
+                data=st.session_state.meeting_brief,
+                file_name=f"briefly-{client['id'].lower()}-meeting-brief.txt",
+                mime="text/plain",
+                key="download_meeting_brief",
+            )
 
     st.markdown("<div style='margin:18px 0 6px'><span class='eyebrow'>Relationship timeline</span><h2 style='margin:4px 0'>Upcoming priorities</h2></div>", unsafe_allow_html=True)
     tasks_html = "".join(
@@ -191,47 +239,3 @@ with main_col:
             with st.expander(f"Audit log · {len(st.session_state.audit_log)}"):
                 for entry in reversed(st.session_state.audit_log):
                     st.caption(f"{entry.get('decision','').title()} · {entry.get('action')} · {entry.get('reviewed_at','')}")
-
-    st.markdown("<div style='margin:28px 0 10px'><span class='eyebrow'>Agentic operations</span><h2 style='margin:4px 0 10px'>Morning book triage</h2></div>", unsafe_allow_html=True)
-    if st.button("✦ Build today's priority queue", key="generate_workday_brief"):
-        if st.session_state.orchestrator is None:
-            st.session_state.workday_brief = f"Bedrock client setup failed: {st.session_state.orchestrator_error}"
-        else:
-            with st.spinner("Reviewing urgent and upcoming work across the book…"):
-                st.session_state.workday_brief = st.session_state.orchestrator.route_query(
-                    "Prepare today's advisor operations brief across the entire client book. Use query_book_metrics to retrieve both urgent_tasks and pending_tasks. Prioritize urgent items and tasks due soon, group by client and date, and list suggested preparation steps. Do not make investment recommendations and do not claim any task or external action was completed.",
-                    client,
-                    CLIENTS,
-                )
-    if st.session_state.workday_brief:
-        with st.container(border=True):
-            st.markdown(st.session_state.workday_brief)
-            st.download_button(
-                "Download today's queue",
-                data=st.session_state.workday_brief,
-                file_name="briefly-daily-priority-queue.txt",
-                mime="text/plain",
-                key="download_workday_brief",
-            )
-
-    st.markdown("<div style='margin:28px 0 10px'><span class='eyebrow'>AI meeting preparation</span><h2 style='margin:4px 0 10px'>Advisor-ready brief</h2></div>", unsafe_allow_html=True)
-    if st.button("✦ Generate meeting brief", type="primary", key="generate_meeting_brief"):
-        if st.session_state.orchestrator is None:
-            st.session_state.meeting_brief = f"Bedrock client setup failed: {st.session_state.orchestrator_error}"
-        else:
-            with st.spinner("Preparing a concise brief with Bedrock…"):
-                st.session_state.meeting_brief = st.session_state.orchestrator.route_query(
-                    "Prepare a concise pre-meeting brief with: client context, discussion agenda based on existing notes and pending tasks, questions to confirm with the client, and items that require advisor judgment. Clearly identify that the supplied portfolio estimate is illustrative. Do not make investment recommendations or imply that any action has been taken.",
-                    client,
-                    CLIENTS,
-                )
-    if st.session_state.meeting_brief:
-        with st.container(border=True):
-            st.markdown(st.session_state.meeting_brief)
-            st.download_button(
-                "Download brief",
-                data=st.session_state.meeting_brief,
-                file_name=f"briefly-{client['id'].lower()}-meeting-brief.txt",
-                mime="text/plain",
-                key="download_meeting_brief",
-            )

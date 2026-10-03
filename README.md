@@ -43,7 +43,7 @@ These integrations require their AWS resources to be created and configured in t
 - Ten synthetic profiles with meeting notes and pending/urgent tasks.
 - Client dashboard and responsive horizontal task timeline.
 - Agentic morning book triage that asks the model to call urgent and pending task tools, then prioritizes work across the book.
-- Muse chat interface with four locally executed tools: illustrative portfolio drift estimate, CRM note keyword search, compliance proposal draft, and aggregate book metrics.
+- LPL Assistant chat interface with four locally executed tools: illustrative portfolio drift estimate, CRM note keyword search, compliance proposal draft, and aggregate book metrics.
 - One-click AI meeting brief with a downloadable text summary.
 - Optional Bedrock Guardrails and Bedrock Knowledge Base retrieval, enabled by configuration.
 - A sidebar AWS credential check that does not show account identifiers.
