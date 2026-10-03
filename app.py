@@ -187,15 +187,18 @@ with side_col:
 
 with main_col:
     st.markdown("<div class='hero'><div><div class='eyebrow'>Advisor workspace · Meeting preparation</div><h1>Good morning, Advisor</h1></div><div class='tag'>● &nbsp; Demo environment · Synthetic data</div></div>", unsafe_allow_html=True)
-    if not st.session_state.intro_done:
+    if "intro_text" not in st.session_state:
         _urgent = [(c["name"], task) for c in CLIENTS for task in c["pending_tasks"] if task["status"] == "urgent"]
         _urgent.sort(key=lambda item: item[1]["date"])
         _aum = sum(c["portfolio_value"] for c in CLIENTS)
         _next = f" First up: {_urgent[0][1]['description']} for {_urgent[0][0]} ({_urgent[0][1]['date']})." if _urgent else ""
-        _summary = f"Reviewing your book… {len(CLIENTS)} clients, ${_aum/1e6:,.1f}M in assets, {len(_urgent)} urgent tasks.{_next}"
-        st.markdown("<div class='eyebrow'>Today</div>", unsafe_allow_html=True)
-        st.write_stream(typewriter(_summary, 0.03))
+        st.session_state.intro_text = f"{len(CLIENTS)} clients, ${_aum/1e6:,.1f}M in assets, {len(_urgent)} urgent tasks.{_next}"
+    st.markdown("<div class='eyebrow'>Today</div>", unsafe_allow_html=True)
+    if not st.session_state.intro_done:
         st.session_state.intro_done = True
+        st.write_stream(typewriter(st.session_state.intro_text, 0.03))
+    else:
+        st.write(st.session_state.intro_text)
     client_options = {f"{client['name']}  ·  {client['id']}": client for client in CLIENTS}
     selected_label = st.selectbox("Select a client", list(client_options), label_visibility="collapsed", key="client_picker")
     client = client_options[selected_label]
