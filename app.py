@@ -36,6 +36,23 @@ h1,h2,h3 { font-family: 'Manrope', sans-serif; letter-spacing: -.035em; }
 .task-status { color:#60738e; font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; }
 .task-card.urgent .task-status { color:#c64040; }
 .section-card { background:white; padding:20px 22px; border-radius:16px; border:1px solid #e4eaf1; }
+.hero { flex-wrap:wrap; gap:.6rem; }
+.task-track { flex-wrap:wrap; }
+@media (max-width: 1000px) {
+  /* Stack the main/chat layout and wrap columns when the window gets narrow */
+  [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; row-gap: 1rem; }
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+  [data-testid="stHorizontalBlock"] > [data-testid="column"] { min-width: 100% !important; flex: 1 1 100% !important; }
+  /* Keep nested column groups (metrics, notes) in a compact 2-up grid */
+  [data-testid="stColumn"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+  [data-testid="column"] [data-testid="stHorizontalBlock"] > [data-testid="column"] { min-width: calc(50% - 1rem) !important; flex: 1 1 calc(50% - 1rem) !important; }
+  .hero h1 { font-size: 1.7rem; }
+}
+@media (max-width: 560px) {
+  [data-testid="stColumn"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+  [data-testid="column"] [data-testid="stHorizontalBlock"] > [data-testid="column"] { min-width: 100% !important; flex: 1 1 100% !important; }
+  .task-card { min-width: 100%; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -73,7 +90,7 @@ if st.session_state.orchestrator is not None:
 main_col, side_col = st.columns([2.2, 1], gap="large")
 
 with side_col:
-    st.markdown("<div style='padding:4px 0 8px'><div style='font-size:1.4rem;font-weight:800;font-family:Manrope'>✦ Muse Assistant</div><div style='color:#78869a;font-size:.83rem'>Ask about this client, their notes, portfolio drift, or your book.</div></div>", unsafe_allow_html=True)
+    st.markdown("<div style='padding:4px 0 8px'><div style='font-size:1.4rem;font-weight:800;font-family:Manrope'>✦ Muse Assistant</div></div>", unsafe_allow_html=True)
     with st.expander("⚙️ AWS & Bedrock settings", expanded=False):
         orchestrator = st.session_state.orchestrator
         if orchestrator is None:
@@ -103,7 +120,7 @@ with side_col:
             )
             st.caption("Guardrail: " + ("active" if orchestrator.guardrail_config else "not configured"))
             st.caption("Knowledge Base: " + ("connected" if orchestrator.knowledge_base_id else "not configured"))
-    with st.container(height=380, border=True):
+    with st.container(height=220, border=True):
         if not st.session_state.messages:
             st.caption("No messages yet. Ask Briefly below.")
         for message in st.session_state.messages:
@@ -142,7 +159,7 @@ with side_col:
         st.rerun()
 
 with main_col:
-    st.markdown("<div class='hero'><div><div class='eyebrow'>Advisor workspace · Meeting preparation</div><h1>Good morning, Advisor</h1><p>Your client relationships, clearly in view.</p></div><div class='tag'>● &nbsp; Demo environment · Synthetic data</div></div>", unsafe_allow_html=True)
+    st.markdown("<div class='hero'><div><div class='eyebrow'>Advisor workspace · Meeting preparation</div><h1>Good morning, Advisor</h1></div><div class='tag'>● &nbsp; Demo environment · Synthetic data</div></div>", unsafe_allow_html=True)
     client_options = {f"{client['name']}  ·  {client['id']}": client for client in CLIENTS}
     selected_label = st.selectbox("Select a client", list(client_options), label_visibility="collapsed", key="client_picker")
     client = client_options[selected_label]
@@ -154,6 +171,26 @@ with main_col:
     c2.metric("Risk profile", client["risk_profile"])
     c3.metric("Age", str(client["age"]))
     c4.metric("Open tasks", str(len(client["pending_tasks"])), delta=f"{sum(t['status'] == 'urgent' for t in client['pending_tasks'])} urgent", delta_color="inverse")
+
+    st.markdown("<div style='margin:18px 0 6px'><span class='eyebrow'>Relationship timeline</span><h2 style='margin:4px 0'>Upcoming priorities</h2></div>", unsafe_allow_html=True)
+    tasks_html = "".join(
+        f"<div class='task-card {'urgent' if task['status'] == 'urgent' else ''}'><div class='task-date'>{task['date']}</div><div class='task-desc'>{task['description']}</div><div class='task-status'>● &nbsp;{task['status']}</div></div>"
+        for task in sorted(client["pending_tasks"], key=lambda item: item["date"])
+    ) or "<div class='task-card'>No upcoming tasks.</div>"
+    st.markdown(f"<div class='task-track'>{tasks_html}</div>", unsafe_allow_html=True)
+
+    left, right = st.columns([1.4, 1])
+    with left:
+        st.markdown("<div class='eyebrow'>Conversation context</div><h3 style='margin:5px 0 12px'>Recent meeting notes</h3>", unsafe_allow_html=True)
+        for note in client["meeting_notes"]:
+            st.markdown(f"<div class='section-card' style='margin-bottom:10px;color:#51647e'>↳ &nbsp;{note}</div>", unsafe_allow_html=True)
+    with right:
+        st.markdown("<div class='eyebrow'>Human in the loop</div><h3 style='margin:5px 0 12px'>Compliance gate</h3>", unsafe_allow_html=True)
+        st.markdown("<div class='section-card' style='color:#61738c;line-height:1.6'>Briefly can draft follow-ups and CRM actions. Every proposed action pauses here for advisor review; approval records a local audit entry.</div>", unsafe_allow_html=True)
+        if st.session_state.audit_log:
+            with st.expander(f"Audit log · {len(st.session_state.audit_log)}"):
+                for entry in reversed(st.session_state.audit_log):
+                    st.caption(f"{entry.get('decision','').title()} · {entry.get('action')} · {entry.get('reviewed_at','')}")
 
     st.markdown("<div style='margin:28px 0 10px'><span class='eyebrow'>Agentic operations</span><h2 style='margin:4px 0 10px'>Morning book triage</h2></div>", unsafe_allow_html=True)
     if st.button("✦ Build today's priority queue", key="generate_workday_brief"):
@@ -198,23 +235,3 @@ with main_col:
                 mime="text/plain",
                 key="download_meeting_brief",
             )
-
-    st.markdown("<div style='margin:28px 0 6px'><span class='eyebrow'>Relationship timeline</span><h2 style='margin:4px 0'>Upcoming priorities</h2></div>", unsafe_allow_html=True)
-    tasks_html = "".join(
-        f"<div class='task-card {'urgent' if task['status'] == 'urgent' else ''}'><div class='task-date'>{task['date']}</div><div class='task-desc'>{task['description']}</div><div class='task-status'>● &nbsp;{task['status']}</div></div>"
-        for task in sorted(client["pending_tasks"], key=lambda item: item["date"])
-    ) or "<div class='task-card'>No upcoming tasks.</div>"
-    st.markdown(f"<div class='task-track'>{tasks_html}</div>", unsafe_allow_html=True)
-
-    left, right = st.columns([1.4, 1])
-    with left:
-        st.markdown("<div class='eyebrow'>Conversation context</div><h3 style='margin:5px 0 12px'>Recent meeting notes</h3>", unsafe_allow_html=True)
-        for note in client["meeting_notes"]:
-            st.markdown(f"<div class='section-card' style='margin-bottom:10px;color:#51647e'>↳ &nbsp;{note}</div>", unsafe_allow_html=True)
-    with right:
-        st.markdown("<div class='eyebrow'>Human in the loop</div><h3 style='margin:5px 0 12px'>Compliance gate</h3>", unsafe_allow_html=True)
-        st.markdown("<div class='section-card' style='color:#61738c;line-height:1.6'>Briefly can draft follow-ups and CRM actions. Every proposed action pauses here for advisor review; approval records a local audit entry.</div>", unsafe_allow_html=True)
-        if st.session_state.audit_log:
-            with st.expander(f"Audit log · {len(st.session_state.audit_log)}"):
-                for entry in reversed(st.session_state.audit_log):
-                    st.caption(f"{entry.get('decision','').title()} · {entry.get('action')} · {entry.get('reviewed_at','')}")
