@@ -1,0 +1,111 @@
+"""Bedrock Converse orchestration and local tool dispatch for Briefly."""
+
+from __future__ import annotations
+
+import json
+import os
+from typing import Any
+
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError, PartialCredentialsError
+
+import tools as action_tools
+
+MODEL_ID = "anthropic.claude-3-sonnet-20240229-v1:0"
+
+
+class BrieflyOrchestrator:
+    """Route advisor prompts through Claude 3 Sonnet and local Python tools."""
+
+    TOOL_CONFIG: dict[str, Any] = {
+        "tools": [
+            {"toolSpec": {"name": "get_portfolio_drift", "description": "Estimate the client's allocation drift versus their risk profile target and flag drift over five percentage points.", "inputSchema": {"json": {"type": "object", "properties": {"client_json": {"type": "object", "description": "Selected synthetic client record."}}, "required": ["client_json"]}}}},
+            {"toolSpec": {"name": "query_crm_notes", "description": "Search the selected client's synthetic CRM meeting notes for a topic.", "inputSchema": {"json": {"type": "object", "properties": {"client_id": {"type": "string"}, "query": {"type": "string"}}, "required": ["client_id", "query"]}}}},
+            {"toolSpec": {"name": "draft_compliance_log", "description": "Draft a proposed external action for advisor review. Never executes the action.", "inputSchema": {"json": {"type": "object", "properties": {"action": {"type": "string"}, "details": {"type": "string"}}, "required": ["action", "details"]}}}},
+            {"toolSpec": {"name": "query_book_metrics", "description": "Answer an aggregate question across the synthetic book. query_type: urgent_tasks, pending_tasks, client_count, assets_under_management.", "inputSchema": {"json": {"type": "object", "properties": {"query_type": {"type": "string"}}, "required": ["query_type"]}}}},
+        ]
+    }
+
+    def __init__(self, region_name: str | None = None, client: Any | None = None) -> None:
+        """Create a Bedrock Runtime client in the chosen AWS region.
+
+        Args:
+            region_name: Optional AWS region, otherwise AWS_REGION/AWS_DEFAULT_REGION.
+            client: Optional injected boto3-compatible client for local testing.
+        """
+        self.region_name = region_name or os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-west-2"
+        self.client = client or boto3.client("bedrock-runtime", region_name=self.region_name)
+
+    @staticmethod
+    def _dispatch(name: str, arguments: dict[str, Any], client_data: dict[str, Any], all_clients_data: list[dict[str, Any]]) -> Any:
+        if name == "get_portfolio_drift":
+            return action_tools.get_portfolio_drift(client_data)
+        if name == "query_crm_notes":
+            return action_tools.query_crm_notes(arguments["client_id"], arguments["query"], all_clients_data)
+        if name == "draft_compliance_log":
+            return action_tools.draft_compliance_log(arguments["action"], arguments["details"])
+        if name == "query_book_metrics":
+            return action_tools.query_book_metrics(arguments["query_type"], all_clients_data)
+        raise ValueError(f"Unknown tool requested: {name}")
+
+    def route_query(self, user_message: str, client_data: dict[str, Any], all_clients_data: list[dict[str, Any]]) -> str:
+        """Answer a prompt, execute requested local tools, and return Claude's synthesis.
+
+        Tool calls are bounded to four rounds. A JSON compliance proposal is
+        preserved as a tagged payload for the frontend's advisor review gate.
+        AWS credential, permission, throttling, and service errors return
+        actionable messages rather than crashing the Streamlit app.
+        """
+        system_prompt = """You are Briefly, a Wealth Management Supervisor Agent for a demonstration. Use only the supplied synthetic client record and tools. Call tools when useful. Treat all numbers and profile targets as illustrative; never present this as financial, legal, or tax advice. Never claim an email, CRM update, trade, or other external action was performed. If asked to take an external action, use draft_compliance_log and explain that advisor approval is required. Keep answers concise, factual, and grounded in tool results."""
+        context = {"selected_client": client_data, "available_client_ids": [c.get("id") for c in all_clients_data]}
+        messages: list[dict[str, Any]] = [{"role": "user", "content": [{"text": f"Selected synthetic context: {json.dumps(context)}\n\nAdvisor request: {user_message}"}]}]
+        try:
+            for _ in range(4):
+                response = self.client.converse(
+                    modelId=MODEL_ID,
+                    system=[{"text": system_prompt}],
+                    messages=messages,
+                    toolConfig=self.TOOL_CONFIG,
+                    inferenceConfig={"maxTokens": 1200, "temperature": 0.2},
+                )
+                output = response.get("output", {}).get("message", {})
+                content = output.get("content", [])
+                tool_uses = [block["toolUse"] for block in content if "toolUse" in block]
+                if not tool_uses:
+                    answer = "\n".join(block.get("text", "") for block in content if "text" in block).strip()
+                    proposals = []
+                    for prior in messages:
+                        for block in prior.get("content", []):
+                            if "toolResult" in block and block["toolResult"].get("toolUseId"):
+                                for result in block["toolResult"].get("content", []):
+                                    raw = result.get("text", "")
+                                    try:
+                                        decoded = json.loads(raw)
+                                        if decoded.get("status") == "pending_advisor_review":
+                                            proposals.append(decoded)
+                                    except (json.JSONDecodeError, AttributeError):
+                                        pass
+                    if proposals:
+                        return "BRIEFLY_PROPOSAL:" + json.dumps({"proposal": proposals[-1], "summary": answer})
+                    return answer or "I couldn't produce a response. Please try again."
+                messages.append(output)
+                results = []
+                for use in tool_uses:
+                    try:
+                        result = self._dispatch(use["name"], use.get("input", {}), client_data, all_clients_data)
+                        result_text = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
+                        results.append({"toolResult": {"toolUseId": use["toolUseId"], "content": [{"text": result_text}], "status": "success"}})
+                    except (KeyError, TypeError, ValueError) as exc:
+                        results.append({"toolResult": {"toolUseId": use["toolUseId"], "content": [{"text": f"Tool input error: {exc}"}], "status": "error"}})
+                messages.append({"role": "user", "content": results})
+            return "The assistant reached its tool-use limit. Please narrow the request and try again."
+        except (NoCredentialsError, PartialCredentialsError):
+            return "AWS credentials are missing or incomplete. Configure a profile with `aws configure` or set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, then retry."
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "AWSServiceError")
+            message = exc.response.get("Error", {}).get("Message", str(exc))
+            if code in {"UnrecognizedClientException", "AccessDeniedException", "UnauthorizedException"}:
+                return f"Bedrock access is not available ({code}). Check AWS credentials, region {self.region_name}, model access, and IAM permissions."
+            return f"Bedrock request failed ({code}): {message}"
+        except BotoCoreError as exc:
+            return f"Could not reach Amazon Bedrock in {self.region_name}: {exc}"
