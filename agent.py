@@ -32,10 +32,10 @@ class BrieflyOrchestrator:
         """
         requested_region = region_name or os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
         profile_name = os.getenv("AWS_PROFILE") or None
-        self.session = boto3.Session(profile_name=profile_name, region_name=requested_region or "us-west-2")
-        self.region_name = self.session.region_name or "us-west-2"
-        self.client = client or self.session.client("bedrock-runtime")
-        self.model_id = os.getenv("BEDROCK_MODEL_ID", "").strip()
+        self.session = boto3.Session(profile_name=profile_name, region_name=requested_region or "us-east-1")
+        self.region_name = self.session.region_name or requested_region or "us-east-1"
+        self.client = client or self.session.client("bedrock-runtime", region_name=self.region_name)
+        self.model_id = os.getenv("BEDROCK_MODEL_ID", "").strip() or "us.amazon.nova-pro-v1:0"
         self.guardrail_id = os.getenv("BEDROCK_GUARDRAIL_ID", "").strip() or None
         self.guardrail_version = os.getenv("BEDROCK_GUARDRAIL_VERSION", "").strip() or None
         self.knowledge_base_id = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID", "").strip() or None
