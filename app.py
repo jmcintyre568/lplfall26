@@ -60,66 +60,55 @@ if "orchestrator" not in st.session_state or not hasattr(st.session_state.orches
         st.session_state.orchestrator_error = str(exc)
 
 
-with st.sidebar:
-    st.markdown("<div style='padding:8px 0 14px'><div style='font-size:1.5rem;font-weight:800;font-family:Manrope'>✦ Briefly</div><div style='color:#9aacc5;font-size:.83rem'>Your meeting prep copilot</div></div>", unsafe_allow_html=True)
-    st.markdown("#### Muse Assistant")
-    st.caption("Ask about this client, their notes, portfolio drift, or your book.")
-    if st.session_state.orchestrator is not None:
-        if st.button("Check AWS connection", use_container_width=True):
-            with st.spinner("Checking AWS credentials…"):
-                st.session_state.aws_status = st.session_state.orchestrator.check_aws_access()
-        if st.session_state.aws_status:
-            connected, status_text = st.session_state.aws_status
-            (st.success if connected else st.warning)(status_text)
-        if "bedrock_model_id" not in st.session_state:
-            st.session_state.bedrock_model_id = st.session_state.orchestrator.model_id
-        if "bedrock_guardrail_id" not in st.session_state:
-            st.session_state.bedrock_guardrail_id = st.session_state.orchestrator.guardrail_id or ""
-        if "bedrock_guardrail_version" not in st.session_state:
-            st.session_state.bedrock_guardrail_version = st.session_state.orchestrator.guardrail_version or "DRAFT"
-        if "bedrock_kb_id" not in st.session_state:
-            st.session_state.bedrock_kb_id = st.session_state.orchestrator.knowledge_base_id or ""
+if st.session_state.orchestrator is not None:
+    _orch = st.session_state.orchestrator
+    st.session_state.setdefault("bedrock_model_id", _orch.model_id)
+    st.session_state.setdefault("bedrock_guardrail_id", _orch.guardrail_id or "")
+    st.session_state.setdefault("bedrock_guardrail_version", _orch.guardrail_version or "DRAFT")
+    st.session_state.setdefault("bedrock_kb_id", _orch.knowledge_base_id or "")
+    _orch.model_id = st.session_state.bedrock_model_id.strip()
+    _orch.update_guardrail(st.session_state.bedrock_guardrail_id, st.session_state.bedrock_guardrail_version)
+    _orch.update_knowledge_base(st.session_state.bedrock_kb_id)
 
-        with st.expander("⚙️ Bedrock & Guardrail Config", expanded=False):
+main_col, side_col = st.columns([2.2, 1], gap="large")
+
+with side_col:
+    st.markdown("<div style='padding:4px 0 8px'><div style='font-size:1.4rem;font-weight:800;font-family:Manrope'>✦ Muse Assistant</div><div style='color:#78869a;font-size:.83rem'>Ask about this client, their notes, portfolio drift, or your book.</div></div>", unsafe_allow_html=True)
+    with st.expander("⚙️ AWS & Bedrock settings", expanded=False):
+        orchestrator = st.session_state.orchestrator
+        if orchestrator is None:
+            st.warning(f"AWS client setup issue: {st.session_state.orchestrator_error}")
+        else:
+            st.markdown("**AWS connection**")
+            if st.button("Check AWS connection", use_container_width=True, key="check_aws"):
+                with st.spinner("Checking AWS credentials…"):
+                    st.session_state.aws_status = orchestrator.check_aws_access()
+            if st.session_state.aws_status:
+                connected, status_text = st.session_state.aws_status
+                (st.success if connected else st.warning)(status_text)
+            st.markdown("**Bedrock**")
             st.text_input(
                 "Model / inference profile ID",
                 key="bedrock_model_id",
-                placeholder="e.g. us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+                placeholder="Paste an active ID from the Bedrock model page",
                 help="Use a model or inference profile that supports Converse and tool use in your chosen region.",
             )
+            st.text_input("Guardrail ID (optional)", key="bedrock_guardrail_id", placeholder="e.g. g-1234567890")
+            st.text_input("Guardrail version (optional)", key="bedrock_guardrail_version", placeholder="e.g. DRAFT or 1")
             st.text_input(
-                "Guardrail ID (Optional)",
-                key="bedrock_guardrail_id",
-                placeholder="e.g. g-1234567890",
-            )
-            st.text_input(
-                "Guardrail Version (Optional)",
-                key="bedrock_guardrail_version",
-                placeholder="e.g. DRAFT or 1",
-            )
-            st.text_input(
-                "Knowledge Base ID (Optional)",
+                "Knowledge Base ID (optional)",
                 key="bedrock_kb_id",
                 placeholder="e.g. kb-1234567890",
-                help="Enables search_advisor_library tool for policy lookups.",
+                help="Enables the search_advisor_library tool for policy lookups.",
             )
-
-        st.session_state.orchestrator.model_id = st.session_state.bedrock_model_id.strip()
-        st.session_state.orchestrator.update_guardrail(
-            st.session_state.bedrock_guardrail_id,
-            st.session_state.bedrock_guardrail_version,
-        )
-        st.session_state.orchestrator.update_knowledge_base(
-            st.session_state.bedrock_kb_id,
-        )
-
-        st.caption("Bedrock Guardrail: " + (f"active ({st.session_state.orchestrator.guardrail_id})" if st.session_state.orchestrator.guardrail_config else "not configured"))
-        st.caption("Advisor Knowledge Base: " + (f"connected ({st.session_state.orchestrator.knowledge_base_id})" if st.session_state.orchestrator.knowledge_base_id else "not configured"))
-    else:
-        st.warning(f"AWS client setup issue: {st.session_state.orchestrator_error}")
-    for index, message in enumerate(st.session_state.messages):
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            st.caption("Guardrail: " + ("active" if orchestrator.guardrail_config else "not configured"))
+            st.caption("Knowledge Base: " + ("connected" if orchestrator.knowledge_base_id else "not configured"))
+    with st.container(height=380, border=True):
+        if not st.session_state.messages:
+            st.caption("No messages yet. Ask Briefly below.")
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
     if st.session_state.pending_proposal:
         proposal = st.session_state.pending_proposal
         with st.expander("⚠️ Pending Advisor Review", expanded=True):
@@ -152,79 +141,80 @@ with st.sidebar:
         st.session_state.messages.append({"role": "assistant", "content": response_text})
         st.rerun()
 
-st.markdown("<div class='hero'><div><div class='eyebrow'>Advisor workspace · Meeting preparation</div><h1>Good morning, Advisor</h1><p>Your client relationships, clearly in view.</p></div><div class='tag'>● &nbsp; Demo environment · Synthetic data</div></div>", unsafe_allow_html=True)
-client_options = {f"{client['name']}  ·  {client['id']}": client for client in CLIENTS}
-selected_label = st.selectbox("Select a client", list(client_options), label_visibility="collapsed", key="client_picker")
-client = client_options[selected_label]
-st.session_state.selected_client = client["id"]
+with main_col:
+    st.markdown("<div class='hero'><div><div class='eyebrow'>Advisor workspace · Meeting preparation</div><h1>Good morning, Advisor</h1><p>Your client relationships, clearly in view.</p></div><div class='tag'>● &nbsp; Demo environment · Synthetic data</div></div>", unsafe_allow_html=True)
+    client_options = {f"{client['name']}  ·  {client['id']}": client for client in CLIENTS}
+    selected_label = st.selectbox("Select a client", list(client_options), label_visibility="collapsed", key="client_picker")
+    client = client_options[selected_label]
+    st.session_state.selected_client = client["id"]
 
-st.markdown(f"<div style='margin:18px 0 10px'><span class='eyebrow'>Client snapshot</span><h2 style='margin:4px 0 0'>{client['name']}</h2></div>", unsafe_allow_html=True)
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Portfolio value", f"${client['portfolio_value']:,.0f}")
-c2.metric("Risk profile", client["risk_profile"])
-c3.metric("Age", str(client["age"]))
-c4.metric("Open tasks", str(len(client["pending_tasks"])), delta=f"{sum(t['status'] == 'urgent' for t in client['pending_tasks'])} urgent", delta_color="inverse")
+    st.markdown(f"<div style='margin:18px 0 10px'><span class='eyebrow'>Client snapshot</span><h2 style='margin:4px 0 0'>{client['name']}</h2></div>", unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Portfolio value", f"${client['portfolio_value']:,.0f}")
+    c2.metric("Risk profile", client["risk_profile"])
+    c3.metric("Age", str(client["age"]))
+    c4.metric("Open tasks", str(len(client["pending_tasks"])), delta=f"{sum(t['status'] == 'urgent' for t in client['pending_tasks'])} urgent", delta_color="inverse")
 
-st.markdown("<div style='margin:28px 0 10px'><span class='eyebrow'>Agentic operations</span><h2 style='margin:4px 0 10px'>Morning book triage</h2></div>", unsafe_allow_html=True)
-if st.button("✦ Build today's priority queue", key="generate_workday_brief"):
-    if st.session_state.orchestrator is None:
-        st.session_state.workday_brief = f"Bedrock client setup failed: {st.session_state.orchestrator_error}"
-    else:
-        with st.spinner("Reviewing urgent and upcoming work across the book…"):
-            st.session_state.workday_brief = st.session_state.orchestrator.route_query(
-                "Prepare today's advisor operations brief across the entire client book. Use query_book_metrics to retrieve both urgent_tasks and pending_tasks. Prioritize urgent items and tasks due soon, group by client and date, and list suggested preparation steps. Do not make investment recommendations and do not claim any task or external action was completed.",
-                client,
-                CLIENTS,
+    st.markdown("<div style='margin:28px 0 10px'><span class='eyebrow'>Agentic operations</span><h2 style='margin:4px 0 10px'>Morning book triage</h2></div>", unsafe_allow_html=True)
+    if st.button("✦ Build today's priority queue", key="generate_workday_brief"):
+        if st.session_state.orchestrator is None:
+            st.session_state.workday_brief = f"Bedrock client setup failed: {st.session_state.orchestrator_error}"
+        else:
+            with st.spinner("Reviewing urgent and upcoming work across the book…"):
+                st.session_state.workday_brief = st.session_state.orchestrator.route_query(
+                    "Prepare today's advisor operations brief across the entire client book. Use query_book_metrics to retrieve both urgent_tasks and pending_tasks. Prioritize urgent items and tasks due soon, group by client and date, and list suggested preparation steps. Do not make investment recommendations and do not claim any task or external action was completed.",
+                    client,
+                    CLIENTS,
+                )
+    if st.session_state.workday_brief:
+        with st.container(border=True):
+            st.markdown(st.session_state.workday_brief)
+            st.download_button(
+                "Download today's queue",
+                data=st.session_state.workday_brief,
+                file_name="briefly-daily-priority-queue.txt",
+                mime="text/plain",
+                key="download_workday_brief",
             )
-if st.session_state.workday_brief:
-    with st.container(border=True):
-        st.markdown(st.session_state.workday_brief)
-        st.download_button(
-            "Download today's queue",
-            data=st.session_state.workday_brief,
-            file_name="briefly-daily-priority-queue.txt",
-            mime="text/plain",
-            key="download_workday_brief",
-        )
 
-st.markdown("<div style='margin:28px 0 10px'><span class='eyebrow'>AI meeting preparation</span><h2 style='margin:4px 0 10px'>Advisor-ready brief</h2></div>", unsafe_allow_html=True)
-if st.button("✦ Generate meeting brief", type="primary", key="generate_meeting_brief"):
-    if st.session_state.orchestrator is None:
-        st.session_state.meeting_brief = f"Bedrock client setup failed: {st.session_state.orchestrator_error}"
-    else:
-        with st.spinner("Preparing a concise brief with Bedrock…"):
-            st.session_state.meeting_brief = st.session_state.orchestrator.route_query(
-                "Prepare a concise pre-meeting brief with: client context, discussion agenda based on existing notes and pending tasks, questions to confirm with the client, and items that require advisor judgment. Clearly identify that the supplied portfolio estimate is illustrative. Do not make investment recommendations or imply that any action has been taken.",
-                client,
-                CLIENTS,
+    st.markdown("<div style='margin:28px 0 10px'><span class='eyebrow'>AI meeting preparation</span><h2 style='margin:4px 0 10px'>Advisor-ready brief</h2></div>", unsafe_allow_html=True)
+    if st.button("✦ Generate meeting brief", type="primary", key="generate_meeting_brief"):
+        if st.session_state.orchestrator is None:
+            st.session_state.meeting_brief = f"Bedrock client setup failed: {st.session_state.orchestrator_error}"
+        else:
+            with st.spinner("Preparing a concise brief with Bedrock…"):
+                st.session_state.meeting_brief = st.session_state.orchestrator.route_query(
+                    "Prepare a concise pre-meeting brief with: client context, discussion agenda based on existing notes and pending tasks, questions to confirm with the client, and items that require advisor judgment. Clearly identify that the supplied portfolio estimate is illustrative. Do not make investment recommendations or imply that any action has been taken.",
+                    client,
+                    CLIENTS,
+                )
+    if st.session_state.meeting_brief:
+        with st.container(border=True):
+            st.markdown(st.session_state.meeting_brief)
+            st.download_button(
+                "Download brief",
+                data=st.session_state.meeting_brief,
+                file_name=f"briefly-{client['id'].lower()}-meeting-brief.txt",
+                mime="text/plain",
+                key="download_meeting_brief",
             )
-if st.session_state.meeting_brief:
-    with st.container(border=True):
-        st.markdown(st.session_state.meeting_brief)
-        st.download_button(
-            "Download brief",
-            data=st.session_state.meeting_brief,
-            file_name=f"briefly-{client['id'].lower()}-meeting-brief.txt",
-            mime="text/plain",
-            key="download_meeting_brief",
-        )
 
-st.markdown("<div style='margin:28px 0 6px'><span class='eyebrow'>Relationship timeline</span><h2 style='margin:4px 0'>Upcoming priorities</h2></div>", unsafe_allow_html=True)
-tasks_html = "".join(
-    f"<div class='task-card {'urgent' if task['status'] == 'urgent' else ''}'><div class='task-date'>{task['date']}</div><div class='task-desc'>{task['description']}</div><div class='task-status'>● &nbsp;{task['status']}</div></div>"
-    for task in sorted(client["pending_tasks"], key=lambda item: item["date"])
-) or "<div class='task-card'>No upcoming tasks.</div>"
-st.markdown(f"<div class='task-track'>{tasks_html}</div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin:28px 0 6px'><span class='eyebrow'>Relationship timeline</span><h2 style='margin:4px 0'>Upcoming priorities</h2></div>", unsafe_allow_html=True)
+    tasks_html = "".join(
+        f"<div class='task-card {'urgent' if task['status'] == 'urgent' else ''}'><div class='task-date'>{task['date']}</div><div class='task-desc'>{task['description']}</div><div class='task-status'>● &nbsp;{task['status']}</div></div>"
+        for task in sorted(client["pending_tasks"], key=lambda item: item["date"])
+    ) or "<div class='task-card'>No upcoming tasks.</div>"
+    st.markdown(f"<div class='task-track'>{tasks_html}</div>", unsafe_allow_html=True)
 
-left, right = st.columns([1.4, 1])
-with left:
-    st.markdown("<div class='eyebrow'>Conversation context</div><h3 style='margin:5px 0 12px'>Recent meeting notes</h3>", unsafe_allow_html=True)
-    for note in client["meeting_notes"]:
-        st.markdown(f"<div class='section-card' style='margin-bottom:10px;color:#51647e'>↳ &nbsp;{note}</div>", unsafe_allow_html=True)
-with right:
-    st.markdown("<div class='eyebrow'>Human in the loop</div><h3 style='margin:5px 0 12px'>Compliance gate</h3>", unsafe_allow_html=True)
-    st.markdown("<div class='section-card' style='color:#61738c;line-height:1.6'>Briefly can draft follow-ups and CRM actions. Every proposed action pauses here for advisor review; approval records a local audit entry.</div>", unsafe_allow_html=True)
-    if st.session_state.audit_log:
-        with st.expander(f"Audit log · {len(st.session_state.audit_log)}"):
-            for entry in reversed(st.session_state.audit_log):
-                st.caption(f"{entry.get('decision','').title()} · {entry.get('action')} · {entry.get('reviewed_at','')}")
+    left, right = st.columns([1.4, 1])
+    with left:
+        st.markdown("<div class='eyebrow'>Conversation context</div><h3 style='margin:5px 0 12px'>Recent meeting notes</h3>", unsafe_allow_html=True)
+        for note in client["meeting_notes"]:
+            st.markdown(f"<div class='section-card' style='margin-bottom:10px;color:#51647e'>↳ &nbsp;{note}</div>", unsafe_allow_html=True)
+    with right:
+        st.markdown("<div class='eyebrow'>Human in the loop</div><h3 style='margin:5px 0 12px'>Compliance gate</h3>", unsafe_allow_html=True)
+        st.markdown("<div class='section-card' style='color:#61738c;line-height:1.6'>Briefly can draft follow-ups and CRM actions. Every proposed action pauses here for advisor review; approval records a local audit entry.</div>", unsafe_allow_html=True)
+        if st.session_state.audit_log:
+            with st.expander(f"Audit log · {len(st.session_state.audit_log)}"):
+                for entry in reversed(st.session_state.audit_log):
+                    st.caption(f"{entry.get('decision','').title()} · {entry.get('action')} · {entry.get('reviewed_at','')}")
