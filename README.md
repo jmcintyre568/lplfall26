@@ -1,6 +1,6 @@
 # Briefly — Wealth Management AI Copilot
 
-A Streamlit meeting-prep MVP for a wealth-advisor hackathon. It uses native `boto3` and Amazon Bedrock Converse with a model ID or inference profile selected in the sidebar or supplied as `BEDROCK_MODEL_ID`; there is no LangChain or LlamaIndex. All included client data is synthetic and contains no contact details or account identifiers.
+A Streamlit meeting-prep MVP for LPL Financial University Fall 2026 Hackathon. It uses native `boto3` and Amazon Bedrock Converse with a model ID or inference profile selected in the sidebar or supplied as `BEDROCK_MODEL_ID`; there is no LangChain or LlamaIndex. All included client data is synthetic and contains no contact details or account identifiers.
 
 ## Run locally
 
