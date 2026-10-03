@@ -45,7 +45,11 @@ if "audit_log" not in st.session_state:
     st.session_state.audit_log = []
 if "pending_proposal" not in st.session_state:
     st.session_state.pending_proposal = None
-if "orchestrator" not in st.session_state:
+if "meeting_brief" not in st.session_state:
+    st.session_state.meeting_brief = None
+if "aws_status" not in st.session_state:
+    st.session_state.aws_status = None
+if "orchestrator" not in st.session_state or not hasattr(st.session_state.orchestrator, "guardrail_config"):
     try:
         st.session_state.orchestrator = BrieflyOrchestrator()
         st.session_state.orchestrator_error = None
@@ -53,10 +57,22 @@ if "orchestrator" not in st.session_state:
         st.session_state.orchestrator = None
         st.session_state.orchestrator_error = str(exc)
 
+
 with st.sidebar:
     st.markdown("<div style='padding:8px 0 14px'><div style='font-size:1.5rem;font-weight:800;font-family:Manrope'>✦ Briefly</div><div style='color:#9aacc5;font-size:.83rem'>Your meeting prep copilot</div></div>", unsafe_allow_html=True)
     st.markdown("#### Muse Assistant")
     st.caption("Ask about this client, their notes, portfolio drift, or your book.")
+    if st.session_state.orchestrator is not None:
+        if st.button("Check AWS connection", use_container_width=True):
+            with st.spinner("Checking AWS credentials…"):
+                st.session_state.aws_status = st.session_state.orchestrator.check_aws_access()
+        if st.session_state.aws_status:
+            connected, status_text = st.session_state.aws_status
+            (st.success if connected else st.warning)(status_text)
+        st.caption("Bedrock Guardrail: " + ("active" if st.session_state.orchestrator.guardrail_config else "not configured"))
+        st.caption("Advisor Knowledge Base: " + ("connected" if st.session_state.orchestrator.knowledge_base_id else "not configured"))
+    else:
+        st.warning(f"AWS client setup issue: {st.session_state.orchestrator_error}")
     for index, message in enumerate(st.session_state.messages):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
@@ -104,6 +120,28 @@ c1.metric("Portfolio value", f"${client['portfolio_value']:,.0f}")
 c2.metric("Risk profile", client["risk_profile"])
 c3.metric("Age", str(client["age"]))
 c4.metric("Open tasks", str(len(client["pending_tasks"])), delta=f"{sum(t['status'] == 'urgent' for t in client['pending_tasks'])} urgent", delta_color="inverse")
+
+st.markdown("<div style='margin:28px 0 10px'><span class='eyebrow'>AI meeting preparation</span><h2 style='margin:4px 0 10px'>Advisor-ready brief</h2></div>", unsafe_allow_html=True)
+if st.button("✦ Generate meeting brief", type="primary", key="generate_meeting_brief"):
+    if st.session_state.orchestrator is None:
+        st.session_state.meeting_brief = f"Bedrock client setup failed: {st.session_state.orchestrator_error}"
+    else:
+        with st.spinner("Preparing a concise brief with Bedrock…"):
+            st.session_state.meeting_brief = st.session_state.orchestrator.route_query(
+                "Prepare a concise pre-meeting brief with: client context, discussion agenda based on existing notes and pending tasks, questions to confirm with the client, and items that require advisor judgment. Clearly identify that the supplied portfolio estimate is illustrative. Do not make investment recommendations or imply that any action has been taken.",
+                client,
+                CLIENTS,
+            )
+if st.session_state.meeting_brief:
+    with st.container(border=True):
+        st.markdown(st.session_state.meeting_brief)
+        st.download_button(
+            "Download brief",
+            data=st.session_state.meeting_brief,
+            file_name=f"briefly-{client['id'].lower()}-meeting-brief.txt",
+            mime="text/plain",
+            key="download_meeting_brief",
+        )
 
 st.markdown("<div style='margin:28px 0 6px'><span class='eyebrow'>Relationship timeline</span><h2 style='margin:4px 0'>Upcoming priorities</h2></div>", unsafe_allow_html=True)
 tasks_html = "".join(
