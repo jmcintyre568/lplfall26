@@ -47,9 +47,11 @@ if "pending_proposal" not in st.session_state:
     st.session_state.pending_proposal = None
 if "meeting_brief" not in st.session_state:
     st.session_state.meeting_brief = None
+if "workday_brief" not in st.session_state:
+    st.session_state.workday_brief = None
 if "aws_status" not in st.session_state:
     st.session_state.aws_status = None
-if "orchestrator" not in st.session_state or not hasattr(st.session_state.orchestrator, "guardrail_config"):
+if "orchestrator" not in st.session_state or not hasattr(st.session_state.orchestrator, "model_id"):
     try:
         st.session_state.orchestrator = BrieflyOrchestrator()
         st.session_state.orchestrator_error = None
@@ -71,6 +73,15 @@ with st.sidebar:
             (st.success if connected else st.warning)(status_text)
         st.caption("Bedrock Guardrail: " + ("active" if st.session_state.orchestrator.guardrail_config else "not configured"))
         st.caption("Advisor Knowledge Base: " + ("connected" if st.session_state.orchestrator.knowledge_base_id else "not configured"))
+        if "bedrock_model_id" not in st.session_state:
+            st.session_state.bedrock_model_id = st.session_state.orchestrator.model_id
+        st.text_input(
+            "Bedrock model / inference profile ID",
+            key="bedrock_model_id",
+            placeholder="Paste an active ID from the Bedrock model page",
+            help="Use a model or inference profile that supports Converse and tool use in your chosen region.",
+        )
+        st.session_state.orchestrator.model_id = st.session_state.bedrock_model_id.strip()
     else:
         st.warning(f"AWS client setup issue: {st.session_state.orchestrator_error}")
     for index, message in enumerate(st.session_state.messages):
@@ -120,6 +131,28 @@ c1.metric("Portfolio value", f"${client['portfolio_value']:,.0f}")
 c2.metric("Risk profile", client["risk_profile"])
 c3.metric("Age", str(client["age"]))
 c4.metric("Open tasks", str(len(client["pending_tasks"])), delta=f"{sum(t['status'] == 'urgent' for t in client['pending_tasks'])} urgent", delta_color="inverse")
+
+st.markdown("<div style='margin:28px 0 10px'><span class='eyebrow'>Agentic operations</span><h2 style='margin:4px 0 10px'>Morning book triage</h2></div>", unsafe_allow_html=True)
+if st.button("✦ Build today's priority queue", key="generate_workday_brief"):
+    if st.session_state.orchestrator is None:
+        st.session_state.workday_brief = f"Bedrock client setup failed: {st.session_state.orchestrator_error}"
+    else:
+        with st.spinner("Reviewing urgent and upcoming work across the book…"):
+            st.session_state.workday_brief = st.session_state.orchestrator.route_query(
+                "Prepare today's advisor operations brief across the entire client book. Use query_book_metrics to retrieve both urgent_tasks and pending_tasks. Prioritize urgent items and tasks due soon, group by client and date, and list suggested preparation steps. Do not make investment recommendations and do not claim any task or external action was completed.",
+                client,
+                CLIENTS,
+            )
+if st.session_state.workday_brief:
+    with st.container(border=True):
+        st.markdown(st.session_state.workday_brief)
+        st.download_button(
+            "Download today's queue",
+            data=st.session_state.workday_brief,
+            file_name="briefly-daily-priority-queue.txt",
+            mime="text/plain",
+            key="download_workday_brief",
+        )
 
 st.markdown("<div style='margin:28px 0 10px'><span class='eyebrow'>AI meeting preparation</span><h2 style='margin:4px 0 10px'>Advisor-ready brief</h2></div>", unsafe_allow_html=True)
 if st.button("✦ Generate meeting brief", type="primary", key="generate_meeting_brief"):

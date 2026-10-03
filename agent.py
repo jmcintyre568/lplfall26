@@ -11,11 +11,8 @@ from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError, 
 
 import tools as action_tools
 
-MODEL_ID = "anthropic.claude-3-sonnet-20240229-v1:0"
-
-
 class BrieflyOrchestrator:
-    """Route advisor prompts through Claude 3 Sonnet and local Python tools."""
+    """Route advisor prompts through the configured Bedrock model and local tools."""
 
     TOOL_CONFIG: dict[str, Any] = {
         "tools": [
@@ -38,6 +35,7 @@ class BrieflyOrchestrator:
         self.session = boto3.Session(profile_name=profile_name, region_name=requested_region or "us-west-2")
         self.region_name = self.session.region_name or "us-west-2"
         self.client = client or self.session.client("bedrock-runtime")
+        self.model_id = os.getenv("BEDROCK_MODEL_ID", "").strip()
         self.knowledge_base_id = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID")
         self.guardrail_id = os.getenv("BEDROCK_GUARDRAIL_ID")
         guardrail_version = os.getenv("BEDROCK_GUARDRAIL_VERSION")
@@ -110,13 +108,15 @@ class BrieflyOrchestrator:
         AWS credential, permission, throttling, and service errors return
         actionable messages rather than crashing the Streamlit app.
         """
+        if not self.model_id:
+            return "Choose an active Bedrock model or inference profile ID in the sidebar before asking Briefly."
         system_prompt = """You are Briefly, a Wealth Management Supervisor Agent for a demonstration. Use only the supplied synthetic client record and tools. Call tools when useful. When citing the advisor library, identify the source returned by the tool and do not invent policy. Treat all numbers and profile targets as illustrative; never present this as financial, legal, or tax advice. Never claim an email, CRM update, trade, or other external action was performed. If asked to take an external action, use draft_compliance_log and explain that advisor approval is required. Keep answers concise, factual, and grounded in tool results."""
         context = {"selected_client": client_data, "available_client_ids": [c.get("id") for c in all_clients_data]}
         messages: list[dict[str, Any]] = [{"role": "user", "content": [{"text": f"Selected synthetic context: {json.dumps(context)}\n\nAdvisor request: {user_message}"}]}]
         try:
             for _ in range(4):
                 request: dict[str, Any] = dict(
-                    modelId=MODEL_ID,
+                    modelId=self.model_id,
                     system=[{"text": system_prompt}],
                     messages=messages,
                     toolConfig=self.tool_config,
