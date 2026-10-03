@@ -59,6 +59,26 @@ h1,h2,h3 { font-family: 'Manrope', sans-serif; letter-spacing: -.035em; }
 </style>
 """, unsafe_allow_html=True)
 
+def typewriter(text: str, delay: float = 0.012):
+    """Yield text word-by-word so Streamlit renders it as if it is being written live."""
+    import time
+    for word in text.split(" "):
+        yield word + " "
+        time.sleep(delay)
+
+
+def render_text(text: str, flag: str) -> None:
+    """Type the text out once when it is new; show it instantly on later reruns."""
+    if st.session_state.get(flag):
+        st.session_state[flag] = False
+        st.write_stream(typewriter(text))
+    else:
+        st.markdown(text)
+
+
+for _flag in ("animate_workday", "animate_meeting", "animate_chat", "intro_done"):
+    st.session_state.setdefault(_flag, False)
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "audit_log" not in st.session_state:
@@ -97,9 +117,12 @@ with side_col:
     with st.container(height=220, border=True):
         if not st.session_state.messages:
             st.caption("No messages yet. Ask LPL Assistant below.")
-        for message in st.session_state.messages:
+        for index, message in enumerate(st.session_state.messages):
             with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+                if message["role"] == "assistant" and index == len(st.session_state.messages) - 1:
+                    render_text(message["content"], "animate_chat")
+                else:
+                    st.markdown(message["content"])
     if st.session_state.pending_proposal:
         proposal = st.session_state.pending_proposal
         with st.expander("⚠️ Pending Advisor Review", expanded=True):
@@ -130,6 +153,7 @@ with side_col:
             st.session_state.pending_proposal = payload["proposal"]
             response_text = payload.get("summary") or "A proposed action is ready for your review."
         st.session_state.messages.append({"role": "assistant", "content": response_text})
+        st.session_state.animate_chat = True
         st.rerun()
     with st.expander("⚙️ AWS & Bedrock settings", expanded=False):
         orchestrator = st.session_state.orchestrator
@@ -163,6 +187,15 @@ with side_col:
 
 with main_col:
     st.markdown("<div class='hero'><div><div class='eyebrow'>Advisor workspace · Meeting preparation</div><h1>Good morning, Advisor</h1></div><div class='tag'>● &nbsp; Demo environment · Synthetic data</div></div>", unsafe_allow_html=True)
+    if not st.session_state.intro_done:
+        _urgent = [(c["name"], task) for c in CLIENTS for task in c["pending_tasks"] if task["status"] == "urgent"]
+        _urgent.sort(key=lambda item: item[1]["date"])
+        _aum = sum(c["portfolio_value"] for c in CLIENTS)
+        _next = f" First up: {_urgent[0][1]['description']} for {_urgent[0][0]} ({_urgent[0][1]['date']})." if _urgent else ""
+        _summary = f"Reviewing your book… {len(CLIENTS)} clients, ${_aum/1e6:,.1f}M in assets, {len(_urgent)} urgent tasks.{_next}"
+        st.markdown("<div class='eyebrow'>Today</div>", unsafe_allow_html=True)
+        st.write_stream(typewriter(_summary, 0.03))
+        st.session_state.intro_done = True
     client_options = {f"{client['name']}  ·  {client['id']}": client for client in CLIENTS}
     selected_label = st.selectbox("Select a client", list(client_options), label_visibility="collapsed", key="client_picker")
     client = client_options[selected_label]
@@ -180,6 +213,7 @@ with main_col:
     run_queue = act1.button("✦ Priority queue", key="generate_workday_brief", use_container_width=True)
     run_brief = act2.button("✦ Meeting brief", type="primary", key="generate_meeting_brief", use_container_width=True)
     if run_queue:
+        st.session_state.animate_workday = True
         if st.session_state.orchestrator is None:
             st.session_state.workday_brief = f"Bedrock client setup failed: {st.session_state.orchestrator_error}"
         else:
@@ -190,6 +224,7 @@ with main_col:
                     CLIENTS,
                 )
     if run_brief:
+        st.session_state.animate_meeting = True
         if st.session_state.orchestrator is None:
             st.session_state.meeting_brief = f"Bedrock client setup failed: {st.session_state.orchestrator_error}"
         else:
@@ -201,7 +236,7 @@ with main_col:
                 )
     if st.session_state.workday_brief:
         with st.expander("Today's priority queue", expanded=True):
-            st.markdown(st.session_state.workday_brief)
+            render_text(st.session_state.workday_brief, "animate_workday")
             st.download_button(
                 "Download today's queue",
                 data=st.session_state.workday_brief,
@@ -211,7 +246,7 @@ with main_col:
             )
     if st.session_state.meeting_brief:
         with st.expander("Advisor-ready meeting brief", expanded=True):
-            st.markdown(st.session_state.meeting_brief)
+            render_text(st.session_state.meeting_brief, "animate_meeting")
             st.download_button(
                 "Download brief",
                 data=st.session_state.meeting_brief,
