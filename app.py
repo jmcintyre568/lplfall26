@@ -71,17 +71,50 @@ with st.sidebar:
         if st.session_state.aws_status:
             connected, status_text = st.session_state.aws_status
             (st.success if connected else st.warning)(status_text)
-        st.caption("Bedrock Guardrail: " + ("active" if st.session_state.orchestrator.guardrail_config else "not configured"))
-        st.caption("Advisor Knowledge Base: " + ("connected" if st.session_state.orchestrator.knowledge_base_id else "not configured"))
         if "bedrock_model_id" not in st.session_state:
             st.session_state.bedrock_model_id = st.session_state.orchestrator.model_id
-        st.text_input(
-            "Bedrock model / inference profile ID",
-            key="bedrock_model_id",
-            placeholder="Paste an active ID from the Bedrock model page",
-            help="Use a model or inference profile that supports Converse and tool use in your chosen region.",
-        )
+        if "bedrock_guardrail_id" not in st.session_state:
+            st.session_state.bedrock_guardrail_id = st.session_state.orchestrator.guardrail_id or ""
+        if "bedrock_guardrail_version" not in st.session_state:
+            st.session_state.bedrock_guardrail_version = st.session_state.orchestrator.guardrail_version or "DRAFT"
+        if "bedrock_kb_id" not in st.session_state:
+            st.session_state.bedrock_kb_id = st.session_state.orchestrator.knowledge_base_id or ""
+
+        with st.expander("⚙️ Bedrock & Guardrail Config", expanded=False):
+            st.text_input(
+                "Model / inference profile ID",
+                key="bedrock_model_id",
+                placeholder="e.g. us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+                help="Use a model or inference profile that supports Converse and tool use in your chosen region.",
+            )
+            st.text_input(
+                "Guardrail ID (Optional)",
+                key="bedrock_guardrail_id",
+                placeholder="e.g. g-1234567890",
+            )
+            st.text_input(
+                "Guardrail Version (Optional)",
+                key="bedrock_guardrail_version",
+                placeholder="e.g. DRAFT or 1",
+            )
+            st.text_input(
+                "Knowledge Base ID (Optional)",
+                key="bedrock_kb_id",
+                placeholder="e.g. kb-1234567890",
+                help="Enables search_advisor_library tool for policy lookups.",
+            )
+
         st.session_state.orchestrator.model_id = st.session_state.bedrock_model_id.strip()
+        st.session_state.orchestrator.update_guardrail(
+            st.session_state.bedrock_guardrail_id,
+            st.session_state.bedrock_guardrail_version,
+        )
+        st.session_state.orchestrator.update_knowledge_base(
+            st.session_state.bedrock_kb_id,
+        )
+
+        st.caption("Bedrock Guardrail: " + (f"active ({st.session_state.orchestrator.guardrail_id})" if st.session_state.orchestrator.guardrail_config else "not configured"))
+        st.caption("Advisor Knowledge Base: " + (f"connected ({st.session_state.orchestrator.knowledge_base_id})" if st.session_state.orchestrator.knowledge_base_id else "not configured"))
     else:
         st.warning(f"AWS client setup issue: {st.session_state.orchestrator_error}")
     for index, message in enumerate(st.session_state.messages):

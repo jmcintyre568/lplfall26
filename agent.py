@@ -36,18 +36,35 @@ class BrieflyOrchestrator:
         self.region_name = self.session.region_name or "us-west-2"
         self.client = client or self.session.client("bedrock-runtime")
         self.model_id = os.getenv("BEDROCK_MODEL_ID", "").strip()
-        self.knowledge_base_id = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID")
-        self.guardrail_id = os.getenv("BEDROCK_GUARDRAIL_ID")
-        guardrail_version = os.getenv("BEDROCK_GUARDRAIL_VERSION")
+        self.guardrail_id = os.getenv("BEDROCK_GUARDRAIL_ID", "").strip() or None
+        self.guardrail_version = os.getenv("BEDROCK_GUARDRAIL_VERSION", "").strip() or None
+        self.knowledge_base_id = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID", "").strip() or None
+
+        self.tool_config: dict[str, Any] = {"tools": list(self.TOOL_CONFIG["tools"])}
         self.guardrail_config = None
-        if self.guardrail_id and guardrail_version:
+        self.update_guardrail(self.guardrail_id, self.guardrail_version)
+        self.update_knowledge_base(self.knowledge_base_id)
+
+    def update_guardrail(self, guardrail_id: str | None, guardrail_version: str | None) -> None:
+        """Update Bedrock Guardrail configuration dynamically."""
+        self.guardrail_id = guardrail_id.strip() if guardrail_id and guardrail_id.strip() else None
+        self.guardrail_version = guardrail_version.strip() if guardrail_version and guardrail_version.strip() else None
+        if self.guardrail_id and self.guardrail_version:
             self.guardrail_config = {
                 "guardrailIdentifier": self.guardrail_id,
-                "guardrailVersion": guardrail_version,
+                "guardrailVersion": self.guardrail_version,
                 "trace": "disabled",
             }
+        else:
+            self.guardrail_config = None
 
-        self.tool_config = {"tools": list(self.TOOL_CONFIG["tools"])}
+    def update_knowledge_base(self, knowledge_base_id: str | None) -> None:
+        """Update Bedrock Knowledge Base ID and tool configuration dynamically."""
+        self.knowledge_base_id = knowledge_base_id.strip() if knowledge_base_id and knowledge_base_id.strip() else None
+        self.tool_config["tools"] = [
+            t for t in self.tool_config["tools"]
+            if t.get("toolSpec", {}).get("name") != "search_advisor_library"
+        ]
         if self.knowledge_base_id:
             self.tool_config["tools"].append({"toolSpec": {
                 "name": "search_advisor_library",
@@ -81,7 +98,9 @@ class BrieflyOrchestrator:
             return action_tools.draft_compliance_log(arguments["action"], arguments["details"])
         if name == "query_book_metrics":
             return action_tools.query_book_metrics(arguments["query_type"], all_clients_data)
-        if name == "search_advisor_library" and self.knowledge_base_id:
+        if name == "search_advisor_library":
+            if not self.knowledge_base_id:
+                return [{"text": "Advisor Knowledge Base is not currently configured.", "source": None}]
             kb_client = self.session.client("bedrock-agent-runtime")
             response = kb_client.retrieve(
                 knowledgeBaseId=self.knowledge_base_id,
