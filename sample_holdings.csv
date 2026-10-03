@@ -1,0 +1,62 @@
+client_id,account_type,ticker,description,asset_class,kind,shares,price,cost_basis,acquired
+C-1001,Taxable,VTI,Total US stock market fund,Equity,Fund,1096.49,285.0,256249.71,2021-03-15
+C-1001,Taxable,VXUS,International stock fund,Equity,Fund,1893.94,66.0,116250.04,2022-06-10
+C-1001,Taxable,BND,Total bond market fund,Fixed Income,Fund,1736.11,72.0,127499.92,2023-02-01
+C-1001,Traditional IRA,VOO,S&P 500 index fund,Equity,Fund,462.96,540.0,174998.88,2019-05-20
+C-1001,Traditional IRA,BND,Total bond market fund,Fixed Income,Fund,2604.17,72.0,187500.24,2022-01-12
+C-1001,Roth IRA,VTI,Total US stock market fund,Equity,Fund,438.6,285.0,81250.65,2020-04-02
+C-1001,Taxable,SGOV,0-3 month Treasury fund,Cash,Fund,1243.78,100.5,124999.89,2026-01-15
+C-1002,Taxable,NVDA,NVIDIA Corp.,Equity,Stock,1809.23,130.0,82319.96,2022-11-04
+C-1002,Taxable,QQQ,Nasdaq-100 index fund,Equity,Fund,350.0,480.0,131040.0,2021-08-18
+C-1002,Taxable,VTI,Total US stock market fund,Equity,Fund,442.11,285.0,110881.19,2022-02-09
+C-1002,Taxable,TSLA,Tesla Inc.,Equity,Stock,235.2,250.0,75264.0,2025-02-20
+C-1002,Taxable,BND,Total bond market fund,Fixed Income,Fund,583.33,72.0,43679.75,2024-03-05
+C-1002,Roth IRA,VOO,S&P 500 index fund,Equity,Fund,311.11,540.0,120959.57,2020-09-11
+C-1002,Taxable,SGOV,0-3 month Treasury fund,Cash,Fund,417.91,100.5,41999.96,2026-02-02
+C-1003,Traditional IRA,BND,Total bond market fund,Fixed Income,Fund,8750.0,72.0,636300.0,2020-07-07
+C-1003,Traditional IRA,AGG,Aggregate bond fund,Fixed Income,Fund,3214.29,98.0,324450.43,2019-10-14
+C-1003,Traditional IRA,VOO,S&P 500 index fund,Equity,Fund,388.89,540.0,115500.33,2016-03-21
+C-1003,Taxable,MUB,National municipal bond fund,Fixed Income,Fund,3925.23,107.0,445199.59,2024-04-30
+C-1003,Taxable,JNJ,Johnson & Johnson,Equity,Stock,656.25,160.0,75600.0,2017-05-09
+C-1003,Taxable,PG,Procter & Gamble,Equity,Stock,617.65,170.0,63000.3,2016-11-30
+C-1003,Taxable,SGOV,0-3 month Treasury fund,Cash,Fund,2089.55,100.5,209999.78,2026-03-02
+C-1003,Taxable,VTI,Total US stock market fund,Equity,Fund,368.42,285.0,60899.83,2016-08-01
+C-1004,Taxable,VTI,Total US stock market fund,Equity,Fund,1026.32,285.0,248626.02,2021-10-12
+C-1004,Taxable,AAPL,Apple Inc.,Equity,Stock,433.33,225.0,43874.66,2019-07-24
+C-1004,Taxable,MSFT,Microsoft Corp.,Equity,Stock,226.74,430.0,48749.1,2020-01-16
+C-1004,Taxable,BND,Total bond market fund,Fixed Income,Fund,1354.17,72.0,102375.25,2024-01-22
+C-1004,Taxable,SGOV,0-3 month Treasury fund,Cash,Fund,970.15,100.5,97500.07,2026-04-06
+C-1004,Traditional IRA,VOO,S&P 500 index fund,Equity,Fund,270.83,540.0,108223.67,2019-12-03
+C-1004,Traditional IRA,BND,Total bond market fund,Fixed Income,Fund,2031.25,72.0,149175.0,2023-05-18
+C-1005,Roth IRA,VTI,Total US stock market fund,Equity,Fund,870.18,285.0,173600.91,2021-04-08
+C-1005,Roth IRA,QQQ,Nasdaq-100 index fund,Equity,Fund,258.33,480.0,81838.94,2021-07-19
+C-1005,Taxable,AMZN,Amazon.com Inc.,Equity,Stock,326.32,190.0,75640.98,2025-01-14
+C-1005,Taxable,TSLA,Tesla Inc.,Equity,Stock,248.0,250.0,83700.0,2025-03-10
+C-1005,Taxable,NVDA,NVIDIA Corp.,Equity,Stock,476.92,130.0,24799.84,2023-02-28
+C-1005,Taxable,SGOV,0-3 month Treasury fund,Cash,Fund,308.46,100.5,31000.23,2026-05-04
+C-1005,Taxable,BND,Total bond market fund,Fixed Income,Fund,430.56,72.0,31930.33,2024-06-17
+C-1006,Traditional IRA,BND,Total bond market fund,Fixed Income,Fund,7000.0,72.0,504000.0,2019-02-12
+C-1006,Traditional IRA,AGG,Aggregate bond fund,Fixed Income,Fund,2571.43,98.0,262080.15,2020-08-25
+C-1006,Traditional IRA,JNJ,Johnson & Johnson,Equity,Stock,525.0,160.0,58800.0,2015-06-17
+C-1006,Traditional IRA,PG,Procter & Gamble,Equity,Stock,494.12,170.0,52080.25,2015-09-08
+C-1006,Traditional IRA,VOO,S&P 500 index fund,Equity,Fund,155.56,540.0,42001.2,2015-04-22
+C-1006,Taxable,MUB,National municipal bond fund,Fixed Income,Fund,2355.14,107.0,264599.98,2024-02-07
+C-1006,Taxable,SGOV,0-3 month Treasury fund,Cash,Fund,2507.46,100.5,251999.73,2026-02-20
+C-1006,Taxable,VTI,Total US stock market fund,Equity,Fund,294.74,285.0,50400.54,2016-12-05
+C-1006,Taxable,XOM,Exxon Mobil Corp.,Equity,Stock,730.43,115.0,109199.29,2025-04-01
+C-1008,Traditional IRA,VOO,S&P 500 index fund,Equity,Fund,525.93,540.0,204481.58,2019-09-30
+C-1008,Traditional IRA,AGG,Aggregate bond fund,Fixed Income,Fund,2897.96,98.0,292520.08,2021-11-09
+C-1008,Traditional IRA,BND,Total bond market fund,Fixed Income,Fund,1972.22,72.0,144839.84,2022-08-12
+C-1008,Traditional IRA,VTI,Total US stock market fund,Equity,Fund,249.12,285.0,70999.2,2026-09-20
+C-1008,Taxable,JPM,JPMorgan Chase & Co.,Equity,Stock,645.45,220.0,82359.42,2018-04-11
+C-1008,Taxable,VXUS,International stock fund,Equity,Fund,2151.52,66.0,153360.35,2025-02-13
+C-1008,Taxable,SGOV,0-3 month Treasury fund,Cash,Fund,706.47,100.5,71000.24,2026-06-03
+C-1008,Taxable,MUB,National municipal bond fund,Fixed Income,Fund,1327.1,107.0,147679.69,2024-05-29
+C-1008,Taxable,VTI,Total US stock market fund,Equity,Fund,498.25,285.0,161881.42,2025-02-18
+C-1010,Traditional IRA,BND,Total bond market fund,Fixed Income,Fund,7875.0,72.0,572670.0,2019-11-19
+C-1010,Traditional IRA,AGG,Aggregate bond fund,Fixed Income,Fund,3857.14,98.0,385559.71,2021-02-24
+C-1010,Taxable,MUB,National municipal bond fund,Fixed Income,Fund,3532.71,107.0,396899.97,2024-03-18
+C-1010,Taxable,SGOV,0-3 month Treasury fund,Cash,Fund,1880.6,100.5,189000.3,2026-03-23
+C-1010,Taxable,JNJ,Johnson & Johnson,Equity,Stock,708.75,160.0,83916.0,2017-02-14
+C-1010,Taxable,PG,Procter & Gamble,Equity,Stock,667.06,170.0,73710.13,2016-07-26
+C-1010,Taxable,XOM,Exxon Mobil Corp.,Equity,Stock,1314.78,115.0,201095.6,2025-05-12
