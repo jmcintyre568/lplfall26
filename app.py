@@ -38,6 +38,34 @@ h1,h2,h3 { font-family: 'Manrope', sans-serif; letter-spacing: -.035em; }
 [data-testid="stMetric"] { background:white; border:1px solid #e4eaf1; border-radius:12px; padding:10px 14px; }
 [data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * { color:#5b6b82 !important; }
 [data-testid="stMetricValue"], [data-testid="stMetricValue"] * { color:#17253b !important; }
+/* High-contrast chat styling for both light and dark modes */
+[data-testid="stChatMessage"] {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  padding: 10px 14px !important;
+  margin-bottom: 8px !important;
+}
+[data-testid="stChatMessage"] * {
+  color: #0f172a !important;
+}
+[data-testid="stChatMessageContent"] {
+  color: #0f172a !important;
+}
+[data-testid="stChatMessageContent"] p,
+[data-testid="stChatMessageContent"] li,
+[data-testid="stChatMessageContent"] span,
+[data-testid="stChatMessageContent"] strong,
+[data-testid="stChatMessageContent"] div {
+  color: #0f172a !important;
+}
+[data-testid="stChatInput"] textarea {
+  color: #0f172a !important;
+  background: #ffffff !important;
+}
+[data-testid="stChatInput"] textarea::placeholder {
+  color: #64748b !important;
+}
 .section-card { background:white; padding:20px 22px; border-radius:16px; border:1px solid #e4eaf1; }
 .hero { flex-wrap:wrap; gap:.6rem; }
 .task-track { flex-wrap:wrap; }
